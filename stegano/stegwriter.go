@@ -10,24 +10,31 @@ type StegWriter struct {
 	index int64
 }
 
-func (w *StegWriter) bitAtOffset(b byte, pos int, offset int64) {
-	index := w.index + int64(offset)
-	w.image.Pix[index] = (w.image.Pix[index] & 0xFE) | ((b >> pos) & 1)
-}
-
 func (w *StegWriter) Pos() int64 {
 	return w.index
 }
 
+func (w *StegWriter) AtEof() bool {
+	return w.index >= int64(len(w.image.Pix))
+}
+
+func (w *StegWriter) OverflowAt(offset int64) bool {
+	return w.index+offset >= int64(len(w.image.Pix))
+}
+
+// Writes a byte by encoding its bits into the least significant bits of the RGB channels of 3 pixels (12 image bytes).
 // Each byte written occupies 3 pixels = 12 image bytes
 // The algorithm used is defined in the OffsetForBit function, which determines how the bits of the byte are distributed across the RGB channels of the pixels.
 func (w *StegWriter) writeByte(b byte) error {
-	if w.index+BYTE_LEN >= int64(len(w.image.Pix)) {
+
+	// Check if we have enough pixels left to write a byte
+	if w.OverflowAt(BYTE_LEN) {
 		return io.EOF
 	}
 
 	for bit := 7; bit >= 0; bit-- {
-		w.bitAtOffset(b, bit, OffsetForBit(bit))
+		index := w.index + OffsetForBit(bit)
+		w.image.Pix[index] = (w.image.Pix[index] & 0xFE) | ((b >> bit) & 1)
 	}
 
 	w.index += BYTE_LEN

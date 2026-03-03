@@ -10,11 +10,19 @@ type StegReader struct {
 	index int64
 }
 
+func (r *StegReader) AtEof() bool {
+	return r.index >= int64(len(r.image.Pix))
+}
+
+func (r *StegReader) OverflowAt(offset int64) bool {
+	return r.index+offset >= int64(len(r.image.Pix))
+}
+
 // Reads a single byte from the image's pixel data by extracting the least significant bits.
 func (r *StegReader) readByte() (b byte, err error) {
 	// Check if we have enough pixels left to read a byte
 	// We need 3 + 3 + 2 bits = 3 colors x 4 bytes each = 12 bytes
-	if r.index+BYTE_LEN >= int64(len(r.image.Pix)) {
+	if r.OverflowAt(BYTE_LEN) {
 		return 0, io.EOF
 	}
 
@@ -50,7 +58,7 @@ func (r *StegReader) Reset() {
 
 func (r *StegReader) Skip(n int64) error {
 	r.index += n * BYTE_LEN
-	if r.index > int64(len(r.image.Pix)) {
+	if r.AtEof() {
 		return io.EOF
 	}
 	return nil
