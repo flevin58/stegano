@@ -10,6 +10,7 @@ import (
 
 func cmdDecode() error {
 	cnvt := flag.NewFlagSet("decode", flag.ExitOnError)
+	as := cnvt.String("as", "", "Saves the embedded file as the new given name")
 	cnvt.Parse(os.Args[2:])
 	what := cnvt.Arg(0)
 	if what == "" {
@@ -19,17 +20,28 @@ func cmdDecode() error {
 	if err != nil {
 		return err
 	}
-	encoded, err := img.IsEncoded()
-	if err != nil {
-		return err
-	}
-	if !encoded {
+
+	if !img.IsEncoded() {
 		return fmt.Errorf("Image is not encoded")
 	}
-	data, err := img.Decode()
+
+	fileName, data, err := img.Decode()
+	if *as != "" {
+		fileName = *as
+	}
 	if err != nil {
 		return err
 	}
-	fmt.Println("Hidden data:", string(data))
+	if fileName == "_TEXT_" {
+		fmt.Println("Hidden data:", string(data))
+	} else {
+		f, err := os.Create(fileName)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		f.Write(data)
+		fmt.Printf("Hidden file '%v' saved to disk.\n", fileName)
+	}
 	return nil
 }

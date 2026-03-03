@@ -12,6 +12,10 @@ import (
 	"strings"
 )
 
+const MAGIC string = "STEG"
+const BYTE_LEN int64 = 12
+const INT64_LEN int64 = BYTE_LEN * 8
+
 type Stegano struct {
 	filePath string
 	image    *image.NRGBA
@@ -43,7 +47,7 @@ func (s *Stegano) SaveAs(filePath string) error {
 func (s *Stegano) NewReader() *StegReader {
 	return &StegReader{
 		image: s.image,
-		index: 0,
+		// index: 0,
 	}
 }
 
@@ -54,29 +58,24 @@ func (s *Stegano) NewWriter() *StegWriter {
 	}
 }
 
-func (s *Stegano) IsEncoded() (bool, error) {
-	var magic [4]byte
+func (s *Stegano) IsEncoded() bool {
 	reader := s.NewReader()
-	n, err := reader.Read(magic[:])
-	if err != nil {
-		return false, err
-	}
-	if n != 4 {
-		return false, fmt.Errorf("Magic number not fully read")
-	}
-	return string(magic[:]) == "STEG", nil
+	return reader.ReadHeader() == MAGIC
 }
 
-func (s *Stegano) Encode(data []byte) error {
+func (s *Stegano) Encode(fileName string, data []byte) error {
 	writer := s.NewWriter()
 
 	// Write a magic number to identify the presence of hidden data
-	_, err := writer.Write([]byte("STEG"))
+	_, err := writer.Write([]byte(MAGIC))
 	if err != nil {
 		return err
 	}
 
-	// Write the length of the hidden data (4 bytes, big-endian)
+	// Write the name of the file or "_TEXT_" to mean embedded message
+	writer.WriteString(fileName)
+
+	// Write the length of the hidden data (8 bytes, big-endian)
 	length := int64(len(data))
 	if err := writer.WriteInt64(length); err != nil {
 		return err
@@ -89,41 +88,39 @@ func (s *Stegano) Encode(data []byte) error {
 	return nil
 }
 
-func (s *Stegano) Decode() (data []byte, err error) {
-	var magic [4]byte
+func (s *Stegano) Decode() (fileName string, data []byte, err error) {
+
+	// Check the magic number to verify the presence of hidden data
+	if !s.IsEncoded() {
+		return fileName, data, fmt.Errorf("Image not encoded")
+	}
+
+	// Skip the header (we just tested it)
 	reader := s.NewReader()
+	reader.Skip(int64(len(MAGIC)))
 
-	// Read the magic number to verify the presence of hidden data
-	n, err := reader.Read(magic[:])
-	if err != nil {
-		return data, err
-	}
-	if n != 4 {
-		return data, fmt.Errorf("Magic number not fully read")
-	}
-	if string(magic[:]) != "STEG" {
-		return data, fmt.Errorf("Invalid magic number: %s", string(magic[:]))
-	}
+	// Read the filename
+	fileName, err = reader.ReadString()
 
-	// Read the length of the hidden data (4 bytes, big-endian)
+	// Read the length of the hidden data (8 bytes, big-endian)
 	length, err := reader.ReadInt64()
 	if err != nil {
-		return data, err
+		return fileName, data, err
 	}
 	if length < 0 {
-		return data, fmt.Errorf("Invalid data length: %d", length)
+		return fileName, data, fmt.Errorf("Invalid data length: %d", length)
 	}
 
 	// Read the hidden data
 	data = make([]byte, length)
-	n, err = reader.Read(data)
+	n, err := reader.Read(data)
 	if err != nil {
-		return data, err
+		return fileName, data, err
 	}
 	if int64(n) != length {
-		return data, fmt.Errorf("Data not fully read")
+		return fileName, data, fmt.Errorf("Data not fully read")
 	}
-	return data, nil
+	return fileName, data, nil
 }
 
 // Loads an image from the specified file path and returns it as an NRGBA image.
