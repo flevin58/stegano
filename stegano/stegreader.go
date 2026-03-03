@@ -17,20 +17,13 @@ func (r *StegReader) readByte() (b byte, err error) {
 	if r.index+BYTE_LEN >= int64(len(r.image.Pix)) {
 		return 0, io.EOF
 	}
+
 	// Extract the least significant bit from the R, G, and B channels of the current pixel
-	rbit := r.image.Pix[r.index+0] & 1
-	gbit := r.image.Pix[r.index+1] & 1
-	bbit := r.image.Pix[r.index+2] & 1
-	b = rbit<<2 | gbit<<1 | bbit
-	rbit = r.image.Pix[r.index+4] & 1
-	gbit = r.image.Pix[r.index+5] & 1
-	bbit = r.image.Pix[r.index+6] & 1
-	b = b<<3 | rbit<<2 | gbit<<1 | bbit
-	// By choice we consider R and G as the last 2 bits
-	rbit = r.image.Pix[r.index+8] & 1
-	gbit = r.image.Pix[r.index+9] & 1
-	b = b<<2 | rbit<<1 | gbit
-	// Move to the next set of pixels for the next byte
+	for bit := 7; bit >= 0; bit-- {
+		lsbit := r.image.Pix[r.index+OffsetForBit(bit)] & 1
+		b = b<<1 | lsbit
+	}
+
 	r.index += BYTE_LEN
 	return b, nil
 }

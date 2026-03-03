@@ -63,6 +63,16 @@ func (s *Stegano) IsEncoded() bool {
 	return reader.ReadHeader() == MAGIC
 }
 
+// Returns the offset to set the n-th bit of the byte
+// In the default scenario, the byte is encoded as follows:
+// pixel:  RGBa RGBa RGba
+// bit:    765- 432- 10--
+// offset: 012- 456- 89--
+func OffsetForBit(n int) int64 {
+	off := []int64{0, 1, 2, 4, 5, 6, 8, 9}
+	return off[7-n]
+}
+
 func (s *Stegano) Encode(fileName string, data []byte) error {
 	writer := s.NewWriter()
 
