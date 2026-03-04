@@ -1,6 +1,7 @@
 package stegano
 
 import (
+	_ "embed"
 	"fmt"
 	"image"
 	"image/color"
@@ -15,6 +16,7 @@ import (
 const MAGIC string = "STEG"
 const BYTE_LEN int64 = 12
 const INT64_LEN int64 = BYTE_LEN * 8
+const MAX_ALGOS int = 20
 
 type Stegano struct {
 	filePath string
@@ -63,14 +65,15 @@ func (s *Stegano) IsEncoded() bool {
 	return reader.ReadHeader() == MAGIC
 }
 
+//go:embed algo.bin
+var algoData []byte
+
 // Returns the offset to set the n-th bit of the byte
-// In the default scenario, the byte is encoded as follows:
-// pixel:  RGBa RGBa RGba
-// bit:    765- 432- 10--
-// offset: 012- 456- 89--
-func OffsetForBit(n int) int64 {
-	off := []int64{0, 1, 2, 4, 5, 6, 8, 9}
-	return off[7-n]
+// The algorithm is externally generated and stored in algo.bin to make it harder to reverse engineer the encoding pattern
+func OffsetForBit(algo, bit int) int64 {
+	algo = algo % (len(algoData) / 8)
+	bit = bit % 8
+	return int64(algoData[algo*8+bit])
 }
 
 func (s *Stegano) Encode(fileName string, data []byte) error {

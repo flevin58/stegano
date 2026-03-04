@@ -8,6 +8,7 @@ import (
 type StegWriter struct {
 	image *image.NRGBA
 	index int64
+	algo  int
 }
 
 func (w *StegWriter) Pos() int64 {
@@ -33,11 +34,14 @@ func (w *StegWriter) writeByte(b byte) error {
 	}
 
 	for bit := 7; bit >= 0; bit-- {
-		index := w.index + OffsetForBit(bit)
+		index := w.index + OffsetForBit(w.algo, bit)
 		w.image.Pix[index] = (w.image.Pix[index] & 0xFE) | ((b >> bit) & 1)
 	}
 
 	w.index += BYTE_LEN
+
+	// Make sure next byte is encoded with another algorithm to make it harder to detect
+	w.algo = (w.algo + 1) % MAX_ALGOS
 	return nil
 }
 

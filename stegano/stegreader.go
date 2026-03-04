@@ -8,6 +8,7 @@ import (
 type StegReader struct {
 	image *image.NRGBA
 	index int64
+	algo  int
 }
 
 func (r *StegReader) AtEof() bool {
@@ -28,11 +29,12 @@ func (r *StegReader) readByte() (b byte, err error) {
 
 	// Extract the least significant bit from the R, G, and B channels of the current pixel
 	for bit := 7; bit >= 0; bit-- {
-		lsbit := r.image.Pix[r.index+OffsetForBit(bit)] & 1
+		lsbit := r.image.Pix[r.index+OffsetForBit(r.algo, bit)] & 1
 		b = b<<1 | lsbit
 	}
 
 	r.index += BYTE_LEN
+	r.algo = (r.algo + 1) % MAX_ALGOS
 	return b, nil
 }
 
@@ -61,6 +63,7 @@ func (r *StegReader) Skip(n int64) error {
 	if r.AtEof() {
 		return io.EOF
 	}
+	r.algo = (r.algo + int(n)) % MAX_ALGOS
 	return nil
 }
 
